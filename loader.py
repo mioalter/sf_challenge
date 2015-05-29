@@ -28,36 +28,32 @@ def gate(s):
 	else:
 		return True
 
+# extreme title standardization: only return first word
 def standardize_title(s):
 	s = s.lower()
 	words = sorted(re.split('\/| |-|\(|\)|\,|\:|\&', s))
 	words = [w.replace('.','') for w in words] #quick hack so 'c.e.o.' maps to 'ceo'
 	good_words = filter(gate, words)
-	return ' '.join(w for w in good_words)
+	return good_words[0] #' '.join(w for w in good_words)
 
+# fewer clusters: look at histogram of data
 def standardize_num_employees(n):
 	try:
 		n = int(n)
-		if 0 < n <= 10:
-			return '1-10'
-		elif 10 < n <= 25:
-			return '11-25'
-		elif 25 < n <= 50:
-			return '26-50'
-		elif 50 < n <= 100:
-			return '51-100'
-		elif 100 < n <= 200:
-			return '101-200'
-		elif 200 < n <= 500:
-			return '201-500'
-		elif 500 < n <= 1000:
-			return '501-1000'
-		elif 1000 < n <= 5000:
-			return '1001-5000'
-		elif 5000 < n <= 10000:
-			return '5001-10000'
+		if 0 <= n < 5:
+			return '0-4'
+		elif 5 <= n < 10:
+			return '5-9'
+		elif 10 <= n < 15:
+			return '10-14'
+		elif 15 <= n < 50:
+			return '15-49'
+		elif 50 <= n < 100:
+			return '50-99'
+		elif 100 <= n < 1000:
+			return '100-999'
 		else:
-			return '>10k'
+			return '>1k'
 	except:
 		return 'n/a'
 
@@ -241,13 +237,16 @@ df = standardize_df(df)
 y = make_dep(df, -2)
 
 cols_and_vals = [ 
-  ('lead_source', 50)
-  , ('offer_type', 50)
-  , ('title',75) 
+  ('lead_source', 6) # certain n_values <= 6-16, counts fall off quickly
+  , ('initial_lead_source', 7) # < 6-12
+  , ('offer_type', 6) # <= 4-6
+  , ('initial_offer_type', 6) #<= 4-6
+  , ('title', 20) 
   , ('job_function', None)
+  , ('job_level', )
   , ('num_employees', None)
   , ('signup_edition', None)
-  , ('promotion_code', 100)
+  , ('promotion_code', 3) # counts fall off very quickly, let's take n_values <= 3
 ]
 X, values = pivot_data(df, cols_and_vals)
 
