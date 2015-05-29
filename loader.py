@@ -7,47 +7,6 @@ import scipy.sparse as ss
 from sklearn.preprocessing import OneHotEncoder as ohe
 from sklearn.preprocessing import LabelEncoder as le
 
-'''
-We have a basic title standardizing function
-We have a function to standardize no. of employees
-We have a function to make the dependent variable
-To do
-* decide how to pivot each column
-* assemble results into one array
-* NNs
-* RNNs
-
-Should we make a dictionary to store these so they are not all floating around?
-Oh, no, we can just transform/standardize the columns directly.
-Access a column by name with df['col_name']
-Columns
-* lead_source, initial_lead_source
-* offer_type, initial_offer_type
-* title
-* job function
-* job_level
-* num_employees
-* signup_edition
-* promotion_code
-
-WOW: one-hot expects INTEGERS even though it's meant to encode categorical variables.
-So you have to map each string value to an integer
-
-
-YES! Scracth that! Use scikit label-encoder! That's exactly what we want.
-
-Can use df.fillna('') to replace nans with strings!
-Also annoying, and could just change the query
-
-SO: LabelEncoder takes no parameters, you have to encode all values.
-OneHotEncoder then pivots all encoded values. Thus, if you want to pivot only the M most frequently-occuring
-values, you have to figure that one out yourself. To solve this we want to 
-* count the number of times each value occurs in a dict {value:count}
-* make a mapping from original values to new values {old_value: new_value} which maps frequently-occuring values
-to themselves and rare vales to 'other'
-* replace old values with new values
-* apply the existing LabelEncoder
-'''
 
 #############
 ## Loading ##
