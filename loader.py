@@ -4,6 +4,7 @@ import re
 import numpy as np
 import pandas as pd
 import scipy.sparse as ss
+import itertools as it
 from sklearn.preprocessing import OneHotEncoder as ohe
 from sklearn.preprocessing import LabelEncoder as le
 
@@ -34,7 +35,10 @@ def standardize_title(s):
 	words = sorted(re.split('\/| |-|\(|\)|\,|\:|\&', s))
 	words = [w.replace('.','') for w in words] #quick hack so 'c.e.o.' maps to 'ceo'
 	good_words = filter(gate, words)
-	return good_words[0] #' '.join(w for w in good_words)
+	out = ''
+	if len(good_words) > 0:
+		out = good_words[0]
+	return out #' '.join(w for w in good_words)
 
 # fewer clusters: look at histogram of data
 def standardize_num_employees(n):
@@ -78,7 +82,6 @@ def one2two(a):
 def make_dep_array(y):
 	return np.array([one2two(a) for a in y])
 
-
 def standardize_df(df):
 	df['title'] = df['title'].apply(standardize_title)
 	df['num_employees'] = df['num_employees'].apply(standardize_num_employees)
@@ -110,7 +113,7 @@ def label_mapper(V, n_values):
 		else:
 			vals_count[v] = 1
 	
-	min_cardinality = 0
+	min_cardinality = 500
 	if n_values != None:
 		min_cardinality = sorted(vals_count.values(), reverse=True)[n_values]
 	
@@ -126,7 +129,7 @@ def encode(V, n_values):
 	new_V, new_values = label_mapper(V, n_values)
 	encoder = le()
 	encoded_V = encoder.fit_transform(new_V)
-	return encoded_V, new_values
+	return encoded_V, new_values, encoder
 
 def make_array(L):
     cols = tuple([l.reshape(len(l),1) for l in L])
@@ -141,19 +144,56 @@ def pivot_data(df, cols_and_vals):
 	
 	encoded_cols = []
 	pivoted_vals = {}
-	
+	encoders = []
 	for p in cols_and_vals:
 		col, n_vals = p[0], p[1]
-		encoded_col, new_vals = encode(df[col], n_vals)
+		encoded_col, new_vals, encoder = encode(df[col], n_vals)
 		encoded_cols.append(encoded_col)
 		pivoted_vals[col] = new_vals
+		encoders.append(encoder)
 	
 	encoded_array = make_array(encoded_cols)
 	
 	oneHot = ohe(categorical_features = 'all', n_values = 'auto')
 	pivoted_array = oneHot.fit_transform(encoded_array)
 	
-	return pivoted_array, pivoted_vals
+	return pivoted_array, pivoted_vals, encoders, oneHot
+
+####################
+## Transform data ##
+####################
+
+def mapper_transform(V,vals):
+	W = []
+	for v in V:
+		if v in vals:
+			W.append(v)
+		else:
+			W.append('other')
+	return np.array(W)
+
+def encoder_transform(V, encoder):
+	return encoder.transform(V)
+
+def pivoter_transform(df, cols_and_vals, encoders, oneHot):
+	'''
+	df - a pandas dataframe
+	cols_and_vals - a list (str, int) of column names and number of values to pivot
+	returns pivoted array and dict {column_name:pivoted_values}
+	'''
+	cols = [c[0] for c in cols_and_vals]
+	mapped_cols = (mapper_transform(df[c], values[c]) for c in cols)
+	
+	pairs = zip(mapped_cols, encoders)
+	encoded_cols = (encoder_transform(mc, encoder) for (mc,encoder) in pairs)
+	
+	encoded_array = make_array(encoded_cols)
+	
+	pivoted_array = oneHot.transform(encoded_array)
+	
+	return pivoted_array
+
+
 
 ################
 ## Evaluation ##
@@ -232,6 +272,9 @@ def evaluate(model, X_val, y_val, title, bins=10):
 ## Main ##
 #########
 
+###########
+## Train ##
+##########
 df = load_data(datafile)
 df = standardize_df(df)
 y = make_dep(df, -2)
@@ -242,11 +285,27 @@ cols_and_vals = [
   , ('offer_type', 6) # <= 4-6
   , ('initial_offer_type', 6) #<= 4-6
   , ('title', 20) 
-  , ('job_function', None)
-  , ('job_level', )
+  , ('job_function', None) # made min_cardinality > 0 in label mapper
+  , ('job_level', None) # min cardiality takes care of this
   , ('num_employees', None)
-  , ('signup_edition', None)
+  , ('signup_edition', 3)
   , ('promotion_code', 3) # counts fall off very quickly, let's take n_values <= 3
 ]
-X, values = pivot_data(df, cols_and_vals)
+
+X, values, encoders, oneHot = pivot_data(df, cols_and_vals)
+
+##########
+## Test ##
+#########
+
+test_datafile = 'data/test_set.sql.tsv'
+test_df = load_data(test_datafile)
+test_df = standardize_df(test_df)
+Z = pivoter_transform(test_df, cols_and_vals, encoders, oneHot)
+
+
+
+
+
+
 
